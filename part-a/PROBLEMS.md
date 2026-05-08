@@ -1,264 +1,514 @@
-# IRCTC Problem Discovery — Part A
+# IRCTC Problem Audit Report
 
-## Summary
-
-* Total problems documented: 3 Given Problems
-* Platform explored: irctc.co.in (live platform)
-* Devices used: Desktop Chrome and Mobile Chrome
-
----
-
-# Problem 1: Tatkal Booking Crashes at 10:00 AM [Given]
-
-## Category:
-
-Performance / Scalability / UX
-
-## What is broken:
-
-The IRCTC Tatkal booking system becomes extremely slow or crashes exactly at 10:00 AM when Tatkal booking opens. Users experience page freezes, session timeouts, CAPTCHA resets, delayed OTPs, and failed payments during the highest traffic window.
-
-## Affected users:
-
-Daily Tatkal passengers across India, especially users from Tier 2 and Tier 3 cities who rely heavily on train travel. Approximately 20–40 lakh users attempt Tatkal booking during the 9:58 AM–10:05 AM window.
-
-## Frequency:
-
-Occurs daily at 10:00 AM during Tatkal booking hours. This is a long-standing recurring issue.
-
-## Current flow — step by step:
-
-1. User opens IRCTC around 9:50 AM and logs into their account.
-2. User searches for trains and selects the required train.
-3. User chooses “Tatkal” quota before 10:00 AM.
-4. Passenger details are filled and the user waits near the payment step.
-5. At exactly 10:00 AM, the user clicks “Book Now”.
-6. The page freezes and continuously shows a loading spinner.
-7. No queue status or progress message is displayed.
-8. After 15–45 seconds, the page either crashes, logs the user out, or throws an HTTP 502/server error.
-9. User refreshes the page and discovers that the Tatkal quota is already full or waitlisted.
-
-## Where exactly it breaks:
-
-Step 6–8. The backend infrastructure cannot handle massive concurrent requests at 10:00 AM. The system also fails to provide meaningful feedback or queue management during overload.
+> Design Engineering & AI Feature Sprint — Part A
+>
+> Platform Audited: IRCTC Web + Mobile Experience
+>
+> Audit Type: UX, Reliability, Scalability & System Flow Analysis
+>
+> Prepared For: Product Engineering Assignment
+>
+> Prepared by: Lokeswara Reddy Muthumula
 
 ---
 
-# Problem 2: Search Filters Do Not Work Reliably [Given]
+# Executive Summary
 
-## Category:
+IRCTC is one of the largest public-facing digital platforms in India, handling millions of train searches and ticket bookings daily. Despite its massive scale and critical role in Indian transportation, the platform suffers from recurring issues involving server crashes, unstable booking flows, payment uncertainty, poor mobile responsiveness, and weak state management.
 
-UX / Information Architecture
+This audit documents 6 major user-facing problems observed across the booking journey. Each problem includes:
 
-## What is broken:
+- What is broken
+- Affected users
+- Frequency analysis
+- Current user flow
+- Exact failure point
+- Root cause analysis
 
-Train search filters such as class type, quota, seat availability, and departure timing behave inconsistently. Filters sometimes reset automatically or display incorrect train results.
-
-## Affected users:
-
-All IRCTC users searching for trains. Senior citizens and first-time users are especially affected because they depend on filters to simplify train selection.
-
-## Frequency:
-
-Occurs intermittently, especially during high traffic periods. Estimated failure rate is around 30–40% during repeated searches.
-
-## Current flow — step by step:
-
-1. User opens the train search page on IRCTC.
-2. User enters source station, destination station, and journey date.
-3. Search results display multiple trains.
-4. User applies filters such as “Sleeper Class”, “Available Seats”, or “Morning Departure”.
-5. The page reloads after applying filters.
-6. Some trains shown still contain waitlist seats instead of available seats.
-7. User clicks a train and notices that the displayed availability does not match the filter.
-8. User navigates back to search results.
-9. Previously selected filters are reset automatically.
-10. User must reapply filters manually again.
-
-## Where exactly it breaks:
-
-Step 5–9. The filter state is not preserved properly, and cached data causes mismatched train availability information.
+The objective of this report is to identify high-impact usability and engineering failures that affect booking reliability and user trust.
 
 ---
 
-# Problem 3: Seat Selection Resets Randomly [Given]
+# Severity Levels
 
-## Category:
-
-Mobile / UX / State Management
-
-## What is broken:
-
-During seat selection, users choose a preferred berth, but the selection resets or changes automatically when moving to the next booking step.
-
-## Affected users:
-
-Families, elderly passengers, women travelers, and users requiring specific berth preferences. Mobile users face this issue more frequently.
-
-## Frequency:
-
-Occurs in around 15–25% of booking sessions, especially on mobile browsers and slower networks.
-
-## Current flow — step by step:
-
-1. User searches and selects a train.
-2. User proceeds to the seat selection page.
-3. The seat map loads showing available and occupied seats.
-4. User selects a preferred berth, such as a lower berth.
-5. The selected berth is highlighted successfully.
-6. User clicks “Proceed” to continue booking.
-7. Passenger details page opens.
-8. The selected berth changes to “Auto” or another seat number.
-9. User navigates back to reselect the berth.
-10. Previously selected seat may already appear unavailable.
-
-## Where exactly it breaks:
-
-Step 6–8. The seat selection state is not transferred properly between booking steps. Mobile page re-rendering and weak state persistence contribute to the issue.
-
+| Severity | Meaning |
+|---|---|
+| CRITICAL | Prevents booking/payment completion |
+| HIGH | Major friction causing booking failure or abandonment |
+| MEDIUM | Significant usability inefficiency |
+| LOW | Minor inconvenience |
 
 ---
 
----
+# Problem 1 — Tatkal Booking Crash at 10:00 AM
 
-# Problem 4: Waitlist Status Updates Are Poor and Unclear [Self-Discovered]
+## Severity
+CRITICAL
 
-## Category:
+## What is Broken
 
-UX / Information Architecture
+The IRCTC server becomes extremely slow or crashes exactly at 10:00 AM when Tatkal quota booking opens. Users experience HTTP 502 errors, session timeouts, CAPTCHA resets, failed OTP verification, and payment uncertainty.
 
-## What is broken:
-
-IRCTC does not clearly notify users when a waitlisted ticket becomes confirmed or RAC. Users must manually keep checking the PNR status repeatedly, and there is no prediction or proactive update system.
-
-## Affected users:
-
-Passengers booking waitlisted tickets, especially students, migrant workers, and long-distance travelers during peak seasons.
-
-## Frequency:
-
-Occurs daily for waitlisted bookings and becomes more common during holidays and festivals.
-
-## How I found it:
-
-I explored the PNR status and waitlist tracking flow after checking train availability for busy routes.
-
-## Screenshot or description:
-
-The PNR status page only shows short codes like WL, RAC, and CNF without explaining confirmation chances, expected movement, or live notifications.
-
-## Current flow — step by step:
-
-1. User searches for trains on a busy route.
-2. Most tickets appear as waitlisted.
-3. User books a WL ticket.
-4. IRCTC displays a waitlist number such as “WL 34”.
-5. User exits the platform after booking.
-6. No future notification or update estimate is shown.
-7. User manually revisits IRCTC multiple times to check status.
-8. Confirmation may happen very close to departure time.
-9. User remains uncertain whether travel is possible.
-
-## Where exactly it breaks:
-
-Step 6–8. IRCTC lacks proactive communication and live waitlist prediction support.
-
-## Impact:
-
-Users experience confusion and anxiety. Many book alternate tickets or repeatedly check the platform manually.
+Even users who successfully reach the payment page often lose their session before completion.
 
 ---
 
-# Problem 5: Mobile Website Form Filling Is Difficult [Self-Discovered]
+## Affected Users
 
-## Category:
+- Tatkal booking users across India
+- Emergency travelers
+- Daily commuters
+- Tier-2 and Tier-3 city passengers
+- Users dependent on urgent railway travel
 
-Mobile / UX
-
-## What is broken:
-
-The IRCTC mobile website is poorly optimized for smaller screens. Passenger forms, dropdowns, and date pickers become difficult to use during the booking flow.
-
-## Affected users:
-
-Mobile web users, especially users from Tier 2 and Tier 3 cities where smartphones are the primary internet device.
-
-## Frequency:
-
-Occurs frequently during booking and payment flows on mobile browsers.
-
-## How I found it:
-
-I opened irctc.co.in on a mobile browser and attempted to complete the booking process until the payment page.
-
-## Screenshot or description:
-
-The mobile booking form becomes cluttered when the keyboard opens. Some fields are partially hidden, and dropdowns behave inconsistently.
-
-## Current flow — step by step:
-
-1. User opens IRCTC on a mobile browser.
-2. User searches for trains.
-3. User selects a train and proceeds to booking.
-4. Passenger details form opens.
-5. Mobile keyboard overlaps multiple fields.
-6. User scrolls repeatedly to access hidden inputs.
-7. Dropdowns for berth, age, and gender close unexpectedly.
-8. User attempts payment after repeated scrolling.
-9. Page responsiveness becomes slow or unstable.
-
-## Where exactly it breaks:
-
-Step 5–7. The responsive layout is not optimized properly for smaller mobile screens.
-
-## Impact:
-
-Users take longer to complete bookings and may enter incorrect passenger details or abandon the booking process.
+Estimated concurrent traffic during Tatkal opening:
+20–40 lakh active users.
 
 ---
 
-# Problem 6: Refund and TDR Filing Process Is Confusing [Self-Discovered]
+## Frequency
 
-## Category:
+Occurs daily during Tatkal booking windows:
 
-UX / Information Architecture
+- 10:00 AM for AC classes
+- 11:00 AM for non-AC classes
 
-## What is broken:
+The issue has existed for years and is widely reported.
 
-The TDR and refund process is difficult to understand. IRCTC uses complex railway terminology and provides limited transparency about refund eligibility and processing status.
+---
 
-## Affected users:
+## Current User Flow — Step by Step
 
-Passengers affected by failed payments, cancelled trains, delayed journeys, or partial travel situations.
+1. User opens IRCTC around 9:50 AM
+2. User logs into account
+3. User searches for train
+4. User selects Tatkal quota
+5. Availability shows “Available 12” before opening
+6. User fills passenger details quickly
+7. User clicks “Book Now” exactly at 10:00 AM
+8. Loading spinner appears with no progress feedback
+9. Page freezes for 15–45 seconds
+10. User receives HTTP 502 / timeout / CAPTCHA reset
+11. User refreshes page
+12. Session expires and user is logged out
+13. User logs back in
+14. Tatkal quota becomes waitlisted or unavailable
+15. User checks bank statement in panic to verify payment status
 
-## Frequency:
+---
 
-Occurs intermittently but affects thousands of passengers daily due to booking and payment failures.
+## Where Exactly It Breaks
 
-## How I found it:
+The failure occurs between steps 7–12.
 
-I explored the cancellation and TDR filing pages while reviewing post-booking support flows.
+The backend receives massive concurrent booking requests with insufficient queue handling and poor request throttling. The frontend provides no queue position or progress visibility, causing users to repeatedly refresh and amplify server load.
 
-## Screenshot or description:
+---
 
-The TDR page contains large text-heavy instructions and multiple technical terms without simple explanations or guided assistance.
+## Root Cause Analysis
 
-## Current flow — step by step:
+- No virtual queueing system
+- Weak concurrency handling
+- Backend overload during peak traffic
+- No real-time booking progress UI
+- Session instability under high load
+- Repeated retries worsening server pressure
 
-1. User experiences a booking issue or payment deduction.
-2. User searches for refund or cancellation options.
-3. User finds the “File TDR” section.
-4. TDR page opens with detailed instructions and conditions.
-5. User struggles to understand eligibility criteria.
-6. User fills the TDR request form with uncertainty.
-7. Refund request is submitted.
-8. User waits several days without clear progress updates.
-9. User repeatedly checks booking history or support pages.
+---
 
-## Where exactly it breaks:
+# Problem 2 — Search Filters Reset or Show Incorrect Results
 
-Step 4–6. The TDR filing flow lacks simple explanations, guided steps, and transparent status tracking.
+## Severity
+HIGH
 
-## Impact:
+## What is Broken
 
-Users lose confidence in the refund process and repeatedly contact customer support for clarification.
+Search filters on the train results page frequently fail to apply correctly. Trains marked as “Waitlisted” continue appearing even after selecting “Available Only.” Filters also reset automatically when users navigate back.
+
+This forces users to manually scan large train lists repeatedly.
+
+---
+
+## Affected Users
+
+- All train search users
+- Senior citizens
+- First-time users
+- Mobile users
+- Users comparing multiple train classes and quotas
+
+Estimated impact:
+All users searching among 20–40 train options.
+
+---
+
+## Frequency
+
+Occurs inconsistently but increases significantly during high traffic periods.
+
+Observed failure rate:
+Approximately 30–40% during repeated searches.
+
+---
+
+## Current User Flow — Step by Step
+
+1. User enters source station
+2. User enters destination station
+3. User selects travel date
+4. User clicks “Search Trains”
+5. Results page loads with 20–40 trains
+6. User selects “Sleeper Class” filter
+7. User selects “Available Only” filter
+8. Page reloads
+9. Waitlisted trains still appear
+10. User opens train details
+11. User goes back to results page
+12. Filters reset to default values
+13. User manually reapplies all filters again
+14. User scans trains manually due to low trust in filters
+
+---
+
+## Where Exactly It Breaks
+
+The failure occurs between steps 7–12.
+
+The frontend loses filter state during data refresh and back navigation. Availability data updates independently from the filter layer, creating stale and inconsistent UI results.
+
+---
+
+## Root Cause Analysis
+
+- Weak frontend state persistence
+- Client-side filtering on stale cached data
+- Live availability refresh not synchronized with filters
+- Missing URL/query-state preservation
+- Poor navigation state handling
+
+---
+
+# Problem 3 — Seat Selection Resets Randomly
+
+## Severity
+HIGH
+
+## What is Broken
+
+Users selecting preferred berths or seats often lose their selected seat while proceeding to passenger details. The system automatically changes the seat to “Auto” or assigns another berth.
+
+This especially impacts families and elderly passengers.
+
+---
+
+## Affected Users
+
+- Families booking together
+- Elderly passengers requiring lower berths
+- Disabled passengers
+- Mobile users
+- Users booking long-distance journeys
+
+Estimated affected journeys:
+30–40% of bookings involve berth preference selection.
+
+---
+
+## Frequency
+
+Occurs intermittently.
+
+Higher occurrence observed on mobile devices.
+
+Approximate occurrence:
+15–25% of seat selection sessions.
+
+---
+
+## Current User Flow — Step by Step
+
+1. User selects train and quota
+2. User proceeds to seat selection page
+3. Seat map loads
+4. User selects preferred lower berth
+5. Selected seat turns highlighted
+6. User clicks “Proceed”
+7. Passenger details form opens
+8. Seat preference changes to “Auto”
+9. Original berth disappears from selection
+10. User returns to seat map
+11. Previously selected berth now appears unavailable
+12. User continues booking with unwanted berth assignment
+
+---
+
+## Where Exactly It Breaks
+
+The failure occurs between steps 5–8.
+
+The seat selection state is not reliably preserved during route transitions. Mobile rendering and backend seat synchronization issues trigger state resets.
+
+---
+
+## Root Cause Analysis
+
+- Weak frontend state synchronization
+- Race conditions during berth allocation
+- Mobile component re-render issues
+- Inconsistent seat-locking mechanism
+- Delayed backend seat confirmation
+
+---
+
+# Problem 4 — Payment Status Confusion After UPI Payment
+
+## Severity
+CRITICAL
+
+## What is Broken
+
+After successful UPI authorization, IRCTC frequently fails to provide immediate transaction confirmation. Users see indefinite loading spinners without knowing whether payment succeeded, failed, or is pending.
+
+This creates panic and duplicate payment attempts.
+
+---
+
+## Affected Users
+
+- UPI payment users
+- Mobile banking users
+- Users booking during peak traffic hours
+- First-time digital payment users
+
+Estimated impact:
+Affects a large percentage of mobile bookings.
+
+---
+
+## Frequency
+
+Occurs intermittently during peak booking periods.
+
+More common during:
+
+- Tatkal booking windows
+- Heavy traffic periods
+- Mobile browser sessions
+
+---
+
+## Current User Flow — Step by Step
+
+1. User selects train
+2. User enters passenger details
+3. User proceeds to payment page
+4. User selects UPI payment
+5. User enters UPI ID
+6. User approves payment in banking app
+7. User returns to IRCTC page
+8. Endless loading spinner appears
+9. No confirmation message shown
+10. User refreshes page in panic
+11. User checks bank account for deduction
+12. Ticket confirmation remains unclear
+13. User retries payment fearing failure
+
+---
+
+## Where Exactly It Breaks
+
+The failure occurs between steps 7–10.
+
+The payment gateway callback status is not communicated clearly to the frontend. The UI lacks real-time transaction state visibility.
+
+---
+
+## Root Cause Analysis
+
+- Weak payment reconciliation flow
+- No real-time payment polling
+- Missing transaction progress indicators
+- Poor retry-safe payment architecture
+- Delayed gateway callback handling
+
+---
+
+# Problem 5 — Session Timeout During Booking
+
+## Severity
+HIGH
+
+## What is Broken
+
+Users are automatically logged out during booking sessions without warning. Passenger information and booking progress are completely lost.
+
+This forces users to restart the booking process from the beginning.
+
+---
+
+## Affected Users
+
+- Senior citizens
+- Slow typists
+- First-time users
+- Mobile users
+- Users booking for multiple passengers
+
+Estimated impact:
+High among users taking longer to fill forms.
+
+---
+
+## Frequency
+
+Occurs frequently after periods of inactivity or during high server load.
+
+Approximate timeout range:
+5–10 minutes.
+
+---
+
+## Current User Flow — Step by Step
+
+1. User logs into account
+2. User searches for train
+3. User selects train and class
+4. User fills passenger details slowly
+5. User reviews journey information
+6. User clicks “Continue”
+7. Session expired popup appears
+8. User redirected to login page
+9. Passenger data is lost
+10. User logs in again
+11. Booking flow restarts from beginning
+
+---
+
+## Where Exactly It Breaks
+
+The failure occurs between steps 6–8.
+
+The session expires without proactive warning or auto-refresh. Booking state is not preserved locally or server-side.
+
+---
+
+## Root Cause Analysis
+
+- Aggressive session timeout policy
+- No autosave functionality
+- Missing token refresh mechanism
+- Weak booking state persistence
+- No inactivity warning system
+
+---
+
+# Problem 6 — Mobile Booking Flow Freezes and Scroll Glitches
+
+## Severity
+HIGH
+
+## What is Broken
+
+The IRCTC mobile booking flow becomes laggy and unstable during passenger detail entry and payment stages. Keyboard interactions trigger layout shifts, freezing, and accidental taps.
+
+This significantly slows mobile bookings.
+
+---
+
+## Affected Users
+
+- Android users
+- Low-end smartphone users
+- Users on slower mobile networks
+- Users booking via mobile browsers
+
+Estimated impact:
+Affects a major percentage of mobile traffic.
+
+---
+
+## Frequency
+
+Occurs frequently during:
+
+- High traffic periods
+- Long booking forms
+- Payment stage transitions
+
+Observed consistently on lower-performance devices.
+
+---
+
+## Current User Flow — Step by Step
+
+1. User opens IRCTC mobile website
+2. User searches for train
+3. User selects train and quota
+4. Passenger details form loads
+5. User taps input field
+6. Mobile keyboard opens
+7. Layout shifts unexpectedly
+8. Scroll position jumps
+9. Form freezes temporarily
+10. User taps wrong field accidentally
+11. Page becomes laggy during input
+12. User refreshes or abandons booking
+
+---
+
+## Where Exactly It Breaks
+
+The failure occurs between steps 6–10.
+
+Frontend rendering becomes unstable during keyboard interactions and dynamic form updates on mobile devices.
+
+---
+
+## Root Cause Analysis
+
+- Heavy DOM rendering
+- Poor mobile optimization
+- Weak responsive layout handling
+- Excessive frontend re-renders
+- Inefficient form rendering logic
+
+---
+
+# Cross-System Findings
+
+| Area | Observation | Severity |
+|---|---|---|
+| Scalability | Tatkal traffic crashes booking pipeline | CRITICAL |
+| Session Management | Booking state frequently lost | HIGH |
+| Payment Reliability | Weak payment confirmation visibility | CRITICAL |
+| Mobile UX | Major responsiveness issues | HIGH |
+| State Management | Filters and seat selection frequently reset | HIGH |
+| Accessibility | Elderly and first-time users struggle heavily | MEDIUM |
+
+---
+
+# Conclusion
+
+IRCTC operates at enormous national scale but suffers from major reliability, usability, and system architecture problems that directly affect millions of users.
+
+The most critical failures occur during:
+
+- Tatkal booking
+- Payment processing
+- Session continuity
+- Mobile booking interactions
+
+These issues reduce user trust, increase booking abandonment, and create transaction anxiety.
+
+Future engineering efforts should prioritize:
+
+- Scalable booking infrastructure
+- Resilient payment architecture
+- Mobile-first optimization
+- Transparent user feedback systems
+- Persistent booking state management
+
+---
+
+# End of Audit Report
+
